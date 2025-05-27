@@ -1,0 +1,5 @@
+$schema: https://azuremlschemas.azureedge.net/latest/data.schema.json
+name: libero_converted
+description: The converted libero dataset.
+type: uri_folder
+path: https://libero.blob.core.windows.net/libero/libero_converted
