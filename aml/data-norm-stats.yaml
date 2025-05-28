@@ -1,15 +1,18 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
-command: uv run compute_norm_stats.py --config-name ${{inputs.config_name}} --output-path-str ${{outputs.stats_folder}}
+command: uv run scripts/compute_norm_stats.py --config-name ${{inputs.config_name}} --output-path-str ${{outputs.stats_folder}}
+environment: azureml:libero-env:3
 inputs:
   config_name: pi0_fast_libero
-environment: azureml:libero-env:1 
-
 outputs:
   stats_folder:
     type: uri_folder
-    path: https://libero.blob.core.windows.net/libero/libero_converted
-
+    path: azureml://datastores/libero/paths/norm-stats/
+  LEROBOT_HOME:
+    type: uri_folder
+    path: azureml://datastores/libero/paths/pi0_fast_libero/
+environment_variables:
+  LEROBOT_HOME: ${{outputs.LEROBOT_HOME}}
 display_name: pi0_compute_norm_stats
 experiment_name: compute_norm_stats
-compute: nabk-E4ds
-code: ../scripts/
+compute: nabk-vm-nc96ads-a100
+code: ..
