@@ -14,5 +14,5 @@ environment_variables:
   LEROBOT_HOME: ${{outputs.LEROBOT_HOME}}
 display_name: pi0_compute_norm_stats
 experiment_name: compute_norm_stats
-compute: nabk-vm-nc96ads-a100
+compute: nabk-d48a-v4
 code: ..
