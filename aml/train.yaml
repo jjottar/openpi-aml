@@ -1,17 +1,18 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
-command: uv run scripts/train.py pi0_fast_libero --exp-name=nabk_28_05 --overwrite --assets-base-dir ${{outputs.LEROBOT_HOME}} --checkpoint-base-dir ${{outputs.model_folder}}
+command: uv run scripts/train.py pi0_fast_libero --exp-name=nabk_02_06 --overwrite --assets-base-dir ${{outputs.LEROBOT_HOME}} --checkpoint-base-dir ${{outputs.MODEL_CHECKPOINTS}}
 environment: azureml:libero-env:3
 inputs:
   config_name: pi0_fast_libero
 outputs:
-  model_folder:
+  MODEL_CHECKPOINTS:
     type: uri_folder
-    path: azureml://datastores/libero/paths/finetuned_model/
+    path: azureml://datastores/libero2/paths/finetuned_model/
   LEROBOT_HOME:
     type: uri_folder
-    path: azureml://datastores/libero/paths/
+    path: azureml://datastores/libero2/paths/
 environment_variables:
   LEROBOT_HOME: ${{outputs.LEROBOT_HOME}}
+  MODEL_CHECKPOINTS: ${{outputs.MODEL_CHECKPOINTS}}
   XLA_PYTHON_CLIENT_PREALLOCATE: "false"
   XLA_PYTHON_CLIENT_MEM_FRACTION: ".95"
   XLA_PYTHON_CLIENT_ALLOCATOR: "platform"
