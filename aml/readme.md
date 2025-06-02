@@ -11,3 +11,5 @@ Dont use a GPU machine.
  az ml job create --file aml/data-norm-stats.yaml --resource-group robotics-ch-north --workspace-name robotics-ch-north
 
  az ml job create --file aml/train.yaml --resource-group robotics-ch-north --workspace-name robotics-ch-north
+
+ We need to mount the adlsgen2 HNS in the AzML

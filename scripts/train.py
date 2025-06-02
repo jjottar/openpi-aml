@@ -193,6 +193,17 @@ def main(config: _config.TrainConfig):
     )
 
     with mlflow.start_run():
+        # Set MLflow tags for better tracking
+        mlflow.set_tag("config_name", config.name)
+        mlflow.set_tag("exp_name", config.exp_name)
+
+        # Log the hyperparameters
+        mlflow.log_param("random_seed", config.seed)
+        mlflow.log_param("batch_size", config.batch_size)
+        mlflow.log_param("num_train_steps", config.num_train_steps)
+        mlflow.log_param("num_workers", config.num_workers)
+        mlflow.log_param("fsdp_devices", config.fsdp_devices)
+
         data_loader = _data_loader.create_data_loader(
             config,
             sharding=data_sharding,
@@ -235,6 +246,9 @@ def main(config: _config.TrainConfig):
                 reduced_info = jax.device_get(jax.tree.map(jnp.mean, stacked_infos))
                 info_str = ", ".join(f"{k}={v:.4f}" for k, v in reduced_info.items())
                 pbar.write(f"Step {step}: {info_str}")
+                # Log metrics to MLflow
+                for k, v in reduced_info.items():
+                    mlflow.log_metric(k, float(v), step=step)
                 infos = []
             batch = next(data_iter)
 

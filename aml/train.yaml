@@ -1,5 +1,5 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
-command: uv run scripts/train.py pi0_fast_libero --exp-name=nabk_02_06 --overwrite --assets-base-dir ${{outputs.LEROBOT_HOME}} --checkpoint-base-dir ${{outputs.MODEL_CHECKPOINTS}}
+command: uv run scripts/train.py pi0_fast_libero --exp-name=nabk_02_06 --resume --assets-base-dir ${{outputs.LEROBOT_HOME}} --checkpoint-base-dir ${{outputs.MODEL_CHECKPOINTS}}
 environment: azureml:libero-env:3
 inputs:
   config_name: pi0_fast_libero
