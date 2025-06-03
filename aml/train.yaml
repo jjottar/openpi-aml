@@ -1,15 +1,19 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
-command: uv run scripts/train.py pi0_fast_libero --exp-name=nabk_02_06 --resume --assets-base-dir ${{outputs.LEROBOT_HOME}} --checkpoint-base-dir ${{outputs.MODEL_CHECKPOINTS}}
-environment: azureml:libero-env:3
+command: uv run scripts/train.py pi0_fast_libero --exp-name=${{inputs.experiment_name}} --overwrite --assets-base-dir ${{outputs.ASSETS_BASE}} --checkpoint-base-dir ${{outputs.MODEL_CHECKPOINTS}} --num-workers 8 --fsdp-devices 2 --batch-size 64
+environment: azureml:libero-env:latest
 inputs:
   config_name: pi0_fast_libero
+  experiment_name: dummy_exp
 outputs:
   MODEL_CHECKPOINTS:
     type: uri_folder
-    path: azureml://datastores/libero2/paths/finetuned_model/
+    path: azureml://datastores/libero/paths/finetuned_model/
   LEROBOT_HOME:
     type: uri_folder
-    path: azureml://datastores/libero2/paths/
+    path: azureml://datastores/libero/paths/pi0_fast_libero
+  ASSETS_BASE:
+    type: uri_folder
+    path: azureml://datastores/libero/paths/
 environment_variables:
   LEROBOT_HOME: ${{outputs.LEROBOT_HOME}}
   MODEL_CHECKPOINTS: ${{outputs.MODEL_CHECKPOINTS}}
@@ -18,5 +22,5 @@ environment_variables:
   XLA_PYTHON_CLIENT_ALLOCATOR: "platform"
 display_name: p0_libero_finetune
 experiment_name: p0_libero_finetune
-compute: nabk-vm-nc96ads-a100
+compute: dummy_compute
 code: ..
