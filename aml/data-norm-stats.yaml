@@ -1,12 +1,12 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
-command: uv run scripts/compute_norm_stats.py --config-name ${{inputs.config_name}} --assets-base-dir ${{outputs.ASSETS_BASE}}
+command: uv run scripts/compute_norm_stats.py --config-name ${{inputs.config_name}} --output-path-str ${{outputs.ASSETS_BASE}}
 environment: azureml:libero-env:3
 inputs:
   config_name: pi0_fast_libero
 outputs:
   ASSETS_BASE:
     type: uri_folder
-    path: azureml://datastores/libero/paths/
+    path: azureml://datastores/libero/paths/pi0_fast_libero/physical-intelligence/libero/
   LEROBOT_HOME:
     type: uri_folder
     path: azureml://datastores/libero/paths/pi0_fast_libero/

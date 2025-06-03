@@ -38,7 +38,7 @@ def create_dataset(config: _config.TrainConfig) -> tuple[_config.DataConfig, _da
     return data_config, dataset
 
 
-def main(config_name: str, max_frames: int | None = None):
+def main(config_name: str, max_frames: int | None = None, output_path_str: str | None = None):
     config = _config.get_config(config_name)
     data_config, dataset = create_dataset(config)
 
@@ -67,8 +67,7 @@ def main(config_name: str, max_frames: int | None = None):
 
     norm_stats = {key: stats.get_statistics() for key, stats in stats.items()}
 
-    output_path = config.assets_dirs / data_config.repo_id
-
+    output_path = config.assets_dirs / data_config.repo_id if output_path_str is None else Path(output_path_str)
     print(f"Writing stats to: {output_path}")
     normalize.save(output_path, norm_stats)
 
