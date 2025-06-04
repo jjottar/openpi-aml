@@ -88,3 +88,13 @@ The fine-tuning will run for 30,000 steps with batches of size 32 by default. Ch
 ```
 az ml job create --file aml/train.yaml --resource-group robotics-ch-north --workspace-name robotics-ch-north --set inputs.experiment_name="my_experiment" --set compute="vm-nc96ads-a100" 
 ```
+
+To overwrite the checkpoint dir if it exists: 
+```
+az ml job create --file aml/train.yaml --resource-group robotics-ch-north --workspace-name robotics-ch-north --set inputs.experiment_name="my_experiment" --set compute="vm-nc96ads-a100" --set inputs.extra_flags="--overwrite"
+```
+
+To continue from last checkpoint: 
+```
+az ml job create --file aml/train.yaml --resource-group robotics-ch-north --workspace-name robotics-ch-north --set inputs.experiment_name="my_experiment" --set compute="vm-nc96ads-a100" --set inputs.extra_flags="--resume"
+```

@@ -1,8 +1,6 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
-command: uv run scripts/compute_norm_stats.py --config-name ${{inputs.config_name}} --output-path-str ${{outputs.ASSETS_BASE}}
+command: uv run scripts/compute_norm_stats.py --config-name pi0_fast_libero --output-path-str ${{outputs.ASSETS_BASE}}
 environment: azureml:libero-env:3
-inputs:
-  config_name: pi0_fast_libero
 outputs:
   ASSETS_BASE:
     type: uri_folder
@@ -14,5 +12,5 @@ environment_variables:
   LEROBOT_HOME: ${{outputs.LEROBOT_HOME}}
 display_name: pi0_compute_norm_stats
 experiment_name: compute_norm_stats
-compute: nabk-d48a-v4
+compute: dummy-compute
 code: ..

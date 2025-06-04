@@ -1,9 +1,19 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
-command: uv run scripts/train.py pi0_fast_libero --exp-name=${{inputs.experiment_name}} --overwrite --assets-base-dir ${{outputs.ASSETS_BASE}} --checkpoint-base-dir ${{outputs.MODEL_CHECKPOINTS}} --num-workers 8 --fsdp-devices 1 --batch-size 32
+command: >-
+ uv run scripts/train.py pi0_fast_libero 
+ --exp-name=${{inputs.pi0_experiment_name}} 
+ --assets-base-dir ${{outputs.ASSETS_BASE}} 
+ --checkpoint-base-dir ${{outputs.MODEL_CHECKPOINTS}} 
+ --num-train-steps ${{inputs.num_train_steps}}
+ --num-workers 8 
+ --fsdp-devices 1 
+ --batch-size 32 
+ ${{inputs.extra_flags}}
 environment: azureml:libero-env:3
 inputs:
-  config_name: pi0_fast_libero
-  experiment_name: dummy_exp
+  pi0_experiment_name: dummy_exp
+  num_train_steps: 30000
+  extra_flags: ''
 outputs:
   MODEL_CHECKPOINTS:
     type: uri_folder

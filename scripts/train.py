@@ -203,6 +203,8 @@ def main(config: _config.TrainConfig):
         mlflow.log_param("num_train_steps", config.num_train_steps)
         mlflow.log_param("num_workers", config.num_workers)
         mlflow.log_param("fsdp_devices", config.fsdp_devices)
+        mlflow.log_param("resume_from_checkpoint", config.resume)
+        mlflow.log_param("overwrite_checkpoint_dir", config.overwrite)
 
         data_loader = _data_loader.create_data_loader(
             config,
