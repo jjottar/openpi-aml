@@ -13,6 +13,7 @@ import jax.experimental
 import jax.numpy as jnp
 import optax
 import tqdm_loggable.auto as tqdm
+import wandb
 import mlflow
 
 import openpi.models.model as _model
@@ -44,6 +45,46 @@ def init_logging():
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     logger.handlers[0].setFormatter(formatter)
+
+
+def init_wandb(config: _config.TrainConfig, *, resuming: bool, log_code: bool = False, enabled: bool = True):
+    if not enabled:
+        wandb.init(mode="disabled")
+        return
+
+    ckpt_dir = config.checkpoint_dir
+    if not ckpt_dir.exists():
+        raise FileNotFoundError(f"Checkpoint directory {ckpt_dir} does not exist.")
+    if resuming:
+        run_id = (ckpt_dir / "wandb_id.txt").read_text().strip()
+        wandb.init(id=run_id, resume="must", project=config.project_name)
+    else:
+        wandb.init(
+            name=config.exp_name,
+            config=dataclasses.asdict(config),
+            project=config.project_name,
+        )
+        (ckpt_dir / "wandb_id.txt").write_text(wandb.run.id)
+
+    if log_code:
+        wandb.run.log_code(epath.Path(__file__).parent.parent)
+
+
+def init_mlflow(config: _config.TrainConfig, *, enabled: bool = True):
+    if not enabled:
+        return
+    # Set MLflow tags for better tracking
+    mlflow.set_tag("config_name", config.name)
+    mlflow.set_tag("exp_name", config.exp_name)
+
+    # Log the hyperparameters
+    mlflow.log_param("random_seed", config.seed)
+    mlflow.log_param("batch_size", config.batch_size)
+    mlflow.log_param("num_train_steps", config.num_train_steps)
+    mlflow.log_param("num_workers", config.num_workers)
+    mlflow.log_param("fsdp_devices", config.fsdp_devices)
+    mlflow.log_param("resume_from_checkpoint", config.resume)
+    mlflow.log_param("overwrite_checkpoint_dir", config.overwrite)
 
 
 def _load_weights_and_validate(loader: _weight_loaders.WeightLoader, params_shape: at.Params) -> at.Params:
@@ -192,19 +233,9 @@ def main(config: _config.TrainConfig):
         resume=config.resume,
     )
 
-    with mlflow.start_run():
-        # Set MLflow tags for better tracking
-        mlflow.set_tag("config_name", config.name)
-        mlflow.set_tag("exp_name", config.exp_name)
-
-        # Log the hyperparameters
-        mlflow.log_param("random_seed", config.seed)
-        mlflow.log_param("batch_size", config.batch_size)
-        mlflow.log_param("num_train_steps", config.num_train_steps)
-        mlflow.log_param("num_workers", config.num_workers)
-        mlflow.log_param("fsdp_devices", config.fsdp_devices)
-        mlflow.log_param("resume_from_checkpoint", config.resume)
-        mlflow.log_param("overwrite_checkpoint_dir", config.overwrite)
+    def run_training():
+        init_wandb(config, resuming=resuming, enabled=config.wandb_enabled)
+        init_mlflow(config, enabled=config.mlflow_enabled)
 
         data_loader = _data_loader.create_data_loader(
             config,
@@ -248,9 +279,11 @@ def main(config: _config.TrainConfig):
                 reduced_info = jax.device_get(jax.tree.map(jnp.mean, stacked_infos))
                 info_str = ", ".join(f"{k}={v:.4f}" for k, v in reduced_info.items())
                 pbar.write(f"Step {step}: {info_str}")
-                # Log metrics to MLflow
-                for k, v in reduced_info.items():
-                    mlflow.log_metric(k, float(v), step=step)
+                if config.wandb_enabled:
+                    wandb.log(reduced_info, step=step)
+                if config.mlflow_enabled:
+                    for k, v in reduced_info.items():
+                        mlflow.log_metric(k, float(v), step=step)
                 infos = []
             batch = next(data_iter)
 
@@ -259,6 +292,12 @@ def main(config: _config.TrainConfig):
 
         logging.info("Waiting for checkpoint manager to finish")
         checkpoint_manager.wait_until_finished()
+
+    if config.mlflow_enabled:
+        with mlflow.start_run():
+            run_training()
+    else:
+        run_training()
 
 
 if __name__ == "__main__":
