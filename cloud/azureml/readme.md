@@ -8,7 +8,7 @@
     - With a system/user assigned managed identity
 - Azure ML CPU compute instance. In the following example and AzureML yaml scripts it is called "vm-d48a-v4".
     - With at least 64 GB RAM. 
-    - Wtih a system/user assigned managed identity.
+    - With a system/user assigned managed identity.
 - ADLS Gen2 storage account with hierarchical namespace enabled. In the following examples and AzureML yaml scripts, the storage account and container are both called "libero". 
     - Users and VM identities need "Storage blob data contributor" role
     - The "libero" container in the "libero" storage account needs to be added as an Azure ML datastore (make sure to mount it as ADLS Gen2 with HNS otherwise you'll face `Os.Errors` during checkpoint writing!)
