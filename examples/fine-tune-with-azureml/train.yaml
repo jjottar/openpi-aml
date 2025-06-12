@@ -1,0 +1,38 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+command: >-
+ uv run scripts/train.py pi0_fast_libero 
+ --exp-name=${{inputs.pi0_experiment_name}} 
+ --assets-base-dir ${{outputs.ASSETS_BASE}} 
+ --checkpoint-base-dir ${{outputs.MODEL_CHECKPOINTS}} 
+ --num-train-steps ${{inputs.num_train_steps}}
+ --num-workers 8 
+ --fsdp-devices 1 
+ --batch-size 32 
+ --mlflow-enabled
+ --no-wandb-enabled
+ ${{inputs.extra_flags}}
+environment: azureml:libero-env:6
+inputs:
+  pi0_experiment_name: dummy_exp
+  num_train_steps: 30000
+  extra_flags: ';'
+outputs:
+  MODEL_CHECKPOINTS:
+    type: uri_folder
+    path: azureml://datastores/libero/paths/finetuned_model/
+  LEROBOT_HOME:
+    type: uri_folder
+    path: azureml://datastores/libero/paths/pi0_fast_libero
+  ASSETS_BASE:
+    type: uri_folder
+    path: azureml://datastores/libero/paths/
+environment_variables:
+  LEROBOT_HOME: ${{outputs.LEROBOT_HOME}}
+  MODEL_CHECKPOINTS: ${{outputs.MODEL_CHECKPOINTS}}
+  XLA_PYTHON_CLIENT_PREALLOCATE: "false"
+  XLA_PYTHON_CLIENT_MEM_FRACTION: ".95"
+  XLA_PYTHON_CLIENT_ALLOCATOR: "platform"
+display_name: p0_libero_finetune
+experiment_name: p0_libero_finetune
+compute: dummy_compute
+code: ../..

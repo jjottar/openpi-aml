@@ -22,6 +22,9 @@ ENV UV_LINK_MODE=copy
 # leak out of the container when we mount the application code.
 ENV UV_PROJECT_ENVIRONMENT=/.venv
 
+# Required to avoid ImportError: libGL.so.1: cannot open shared object file: No such file or directory
+RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
+
 # Install the project's dependencies using the lockfile and settings
 RUN uv venv --python 3.11.9 $UV_PROJECT_ENVIRONMENT
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -29,6 +32,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     --mount=type=bind,source=packages/openpi-client/pyproject.toml,target=packages/openpi-client/pyproject.toml \
     --mount=type=bind,source=packages/openpi-client/src,target=packages/openpi-client/src \
-    GIT_LFS_SKIP_SMUDGE=1 uv sync --frozen --no-install-project --no-dev
+    GIT_LFS_SKIP_SMUDGE=1 uv sync --frozen --no-install-project --no-dev && uv pip install mlflow azureml-mlflow
 
 CMD /bin/bash -c "uv run scripts/serve_policy.py $SERVER_ARGS"
