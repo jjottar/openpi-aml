@@ -8,12 +8,14 @@ command: >-
  --num-workers 8 
  --fsdp-devices 1 
  --batch-size 32 
+ --mlflow-enabled
+ --no-wandb-enabled
  ${{inputs.extra_flags}}
-environment: azureml:libero-env:3
+environment: azureml:libero-env:6
 inputs:
   pi0_experiment_name: dummy_exp
   num_train_steps: 30000
-  extra_flags: ''
+  extra_flags: ';'
 outputs:
   MODEL_CHECKPOINTS:
     type: uri_folder
@@ -33,4 +35,4 @@ environment_variables:
 display_name: p0_libero_finetune
 experiment_name: p0_libero_finetune
 compute: dummy_compute
-code: ..
+code: ../..

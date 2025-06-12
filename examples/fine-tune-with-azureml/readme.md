@@ -70,7 +70,7 @@ Calculate the norm stats of the libero dataset.
 > Note: The environment version may need to be updated in the `data-norm-stats.yaml` file. You can use `--set environment` to change the value or edit the file directly. 
 
 ```
- az ml job create --file cloud/azureml/data-norm-stats.yaml --resource-group robotics-ch-north --workspace-name robotics-ch-north --set compute="vm-d48a-v4"
+ az ml job create --file examples/fine-tune-with-azureml/data-norm-stats.yaml --resource-group robotics-ch-north --workspace-name robotics-ch-north --set compute="vm-d48a-v4"
 ```
 
 The data should be ready at this point. Your container structure should resemble:
@@ -86,15 +86,15 @@ The fine-tuning will run for 30,000 steps with batches of size 32 by default. Ch
 > Note: The environment version may need to be updated in the `train.yaml` file. You can use `--set environment` to change the value or edit the file directly. 
 
 ```
-az ml job create --file cloud/azureml/train.yaml --resource-group robotics-ch-north --workspace-name robotics-ch-north --set inputs.experiment_name="my_experiment" --set compute="vm-nc96ads-a100" 
+az ml job create --file examples/fine-tune-with-azureml/train.yaml --resource-group robotics-ch-north --workspace-name robotics-ch-north --set inputs.pi0_experiment_name="my_experiment" --set compute="vm-nc96ads-a100" 
 ```
 
 To overwrite the checkpoint dir if it exists: 
 ```
-az ml job create --file cloud/azureml/train.yaml --resource-group robotics-ch-north --workspace-name robotics-ch-north --set inputs.experiment_name="my_experiment" --set compute="vm-nc96ads-a100" --set inputs.extra_flags="--overwrite"
+az ml job create --file examples/fine-tune-with-azureml/train.yaml --resource-group robotics-ch-north --workspace-name robotics-ch-north --set inputs.pi0_experiment_name="my_experiment" --set compute="vm-nc96ads-a100" --set inputs.extra_flags="--overwrite"
 ```
 
 To continue from last checkpoint: 
 ```
-az ml job create --file cloud/azureml/train.yaml --resource-group robotics-ch-north --workspace-name robotics-ch-north --set inputs.experiment_name="my_experiment" --set compute="vm-nc96ads-a100" --set inputs.extra_flags="--resume"
+az ml job create --file examples/fine-tune-with-azureml/train.yaml --resource-group robotics-ch-north --workspace-name robotics-ch-north --set inputs.experiment_name="my_experiment" --set compute="vm-nc96ads-a100" --set inputs.extra_flags="--resume"
 ```

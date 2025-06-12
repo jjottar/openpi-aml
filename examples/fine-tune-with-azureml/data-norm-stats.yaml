@@ -13,4 +13,4 @@ environment_variables:
 display_name: pi0_compute_norm_stats
 experiment_name: compute_norm_stats
 compute: dummy_compute
-code: ..
+code: ../..
