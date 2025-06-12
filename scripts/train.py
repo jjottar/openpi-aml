@@ -47,11 +47,17 @@ def init_logging():
     logger.handlers[0].setFormatter(formatter)
 
 
-def init_wandb(config: _config.TrainConfig, *, resuming: bool, log_code: bool = False, enabled: bool = True):
-    if not enabled:
+def init_tracking(config: _config.TrainConfig, *, resuming: bool, log_code: bool = False):
+    if config.wandb_enabled:
+        init_wandb(config, resuming=resuming, log_code=log_code)
+    else:
         wandb.init(mode="disabled")
-        return
 
+    if config.mlflow_enabled:
+        init_mlflow(config)
+
+
+def init_wandb(config: _config.TrainConfig, *, resuming: bool, log_code: bool = False):
     ckpt_dir = config.checkpoint_dir
     if not ckpt_dir.exists():
         raise FileNotFoundError(f"Checkpoint directory {ckpt_dir} does not exist.")
@@ -70,9 +76,7 @@ def init_wandb(config: _config.TrainConfig, *, resuming: bool, log_code: bool = 
         wandb.run.log_code(epath.Path(__file__).parent.parent)
 
 
-def init_mlflow(config: _config.TrainConfig, *, enabled: bool = True):
-    if not enabled:
-        return
+def init_mlflow(config: _config.TrainConfig):
     # Set MLflow tags for better tracking
     mlflow.set_tag("config_name", config.name)
     mlflow.set_tag("exp_name", config.exp_name)
@@ -85,6 +89,14 @@ def init_mlflow(config: _config.TrainConfig, *, enabled: bool = True):
     mlflow.log_param("fsdp_devices", config.fsdp_devices)
     mlflow.log_param("resume_from_checkpoint", config.resume)
     mlflow.log_param("overwrite_checkpoint_dir", config.overwrite)
+
+
+def log_metrics(config: _config.TrainConfig, metrics: dict[str, Any], step: int):
+    if config.wandb_enabled:
+        wandb.log(metrics, step=step)
+    if config.mlflow_enabled:
+        for k, v in metrics.items():
+            mlflow.log_metric(k, float(v), step=step)
 
 
 def _load_weights_and_validate(loader: _weight_loaders.WeightLoader, params_shape: at.Params) -> at.Params:
@@ -234,8 +246,7 @@ def main(config: _config.TrainConfig):
     )
 
     def run_training():
-        init_wandb(config, resuming=resuming, enabled=config.wandb_enabled)
-        init_mlflow(config, enabled=config.mlflow_enabled)
+        init_tracking(config, resuming=resuming)
 
         data_loader = _data_loader.create_data_loader(
             config,
@@ -279,11 +290,7 @@ def main(config: _config.TrainConfig):
                 reduced_info = jax.device_get(jax.tree.map(jnp.mean, stacked_infos))
                 info_str = ", ".join(f"{k}={v:.4f}" for k, v in reduced_info.items())
                 pbar.write(f"Step {step}: {info_str}")
-                if config.wandb_enabled:
-                    wandb.log(reduced_info, step=step)
-                if config.mlflow_enabled:
-                    for k, v in reduced_info.items():
-                        mlflow.log_metric(k, float(v), step=step)
+                log_metrics(config, reduced_info, step)
                 infos = []
             batch = next(data_iter)
 
