@@ -56,7 +56,7 @@ Next, download the "libero" dataset and upload it to the "libero" container in t
    ```
    Copy the files
    ```
-   azcopy "/path/to/downloaded/libero/dataset/*" "https://libero.blob.core.windows.net/libero/pi0_fast_libero/physical-intelligence/libero/" --recursive=true
+   azcopy "/path/to/downloaded/libero/dataset/*" "https://libero.dfs.core.windows.net/libero/pi0_fast_libero/physical-intelligence/libero/" --recursive=true
    ```
 
 ### Generate the norm stats
