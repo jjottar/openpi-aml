@@ -12,6 +12,8 @@ from openpi.models import tokenizer as _tokenizer
 from openpi.shared import array_typing as at
 from openpi.shared import normalize as _normalize
 
+import logging
+
 DataDict: TypeAlias = at.PyTree
 NormStats: TypeAlias = _normalize.NormStats
 
@@ -98,6 +100,7 @@ class RepackTransform(DataTransformFn):
 
     def __call__(self, data: DataDict) -> DataDict:
         flat_item = flatten_dict(data)
+        # raise ValueError(f"WRONG flat_item keys {flat_item.keys()}. structure: {self.structure}")
         return jax.tree.map(lambda k: flat_item[k], self.structure)
 
 

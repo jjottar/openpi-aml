@@ -8,12 +8,14 @@ to the config assets directory.
 from pathlib import Path
 import numpy as np
 import tqdm
+from openpi.models import pi0_fast
 import tyro
 
 import openpi.shared.normalize as normalize
 import openpi.training.config as _config
 import openpi.training.data_loader as _data_loader
 import openpi.transforms as transforms
+import openpi.training.weight_loaders as _weight_loaders
 
 
 class RemoveStrings(transforms.DataTransformFn):
@@ -39,6 +41,19 @@ def create_dataset(config: _config.TrainConfig) -> tuple[_config.DataConfig, _da
 
 
 def main(config_name: str, max_frames: int | None = None, output_path_str: str | None = None):
+    custom_config = _config.TrainConfig(
+        name="pi0_fast_custom",
+        model=pi0_fast.Pi0FASTConfig(action_dim=7, action_horizon=10, max_token_len=180),
+        data=_config.LeRobotV2DataConfig(
+            repo_id="noraabk/so101-goat-picking-v1",
+            base_config=_config.DataConfig(prompt_from_task=True),
+        ),
+        weight_loader=_weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_fast_base/params"),
+        num_train_steps=30_000,
+    )
+    _config._CONFIGS.append(custom_config)  # noqa: SLF001
+    _config._CONFIGS_DICT["pi0_fast_custom"] = custom_config  # noqa: SLF001
+
     config = _config.get_config(config_name)
     data_config, dataset = create_dataset(config)
 

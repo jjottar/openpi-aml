@@ -1,5 +1,9 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
-command: uv run scripts/compute_norm_stats.py --config-name pi0_fast_libero --output-path-str ${{outputs.ASSETS_BASE}}
+command: 
+ GIT_LFS_SKIP_SMUDGE=1 uv pip install -e . && 
+ uv run scripts/compute_norm_stats.py
+ --config-name pi0_fast_custom
+ --output-path-str ${{outputs.ASSETS_BASE}}
 environment: azureml:<env_name>:<env_version>
 outputs:
   ASSETS_BASE:
