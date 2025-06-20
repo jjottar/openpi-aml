@@ -6,6 +6,7 @@ to the config assets directory.
 """
 
 from pathlib import Path
+import dataclasses
 
 import numpy as np
 import tqdm
@@ -39,8 +40,16 @@ def create_dataset(config: _config.TrainConfig) -> tuple[_config.DataConfig, _da
     return data_config, dataset
 
 
-def main(config_name: str, max_frames: int | None = None, output_path_str: str | None = None):
+def main(
+    config_name: str, max_frames: int | None = None, output_path_str: str | None = None, repo_id: str | None = None
+):
     config = _config.get_config(config_name)
+
+    # If repo_id is provided, override it in the config's data config
+    if repo_id is not None:
+        # dataclasses.replace returns a new instance with the updated field
+        config = dataclasses.replace(config, data=dataclasses.replace(config.data, repo_id=repo_id))
+
     data_config, dataset = create_dataset(config)
 
     num_frames = len(dataset)
