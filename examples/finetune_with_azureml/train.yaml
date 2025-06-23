@@ -1,6 +1,6 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
 command: >-
- uv run --no-sync train.py pi0_fast_libero 
+ uv run scripts/train.py pi0_fast_libero 
  --exp-name=${{inputs.pi0_experiment_name}} 
  --assets-base-dir ${{outputs.ASSETS_BASE}} 
  --checkpoint-base-dir ${{outputs.MODEL_CHECKPOINTS}} 
@@ -10,11 +10,15 @@ command: >-
  --batch-size 32 
  --mlflow-enabled
  --no-wandb-enabled
+ --data.repo-id ${{inputs.train_repo_id}}
+ --val_repo_id ${{inputs.val_repo_id}}
  ${{inputs.extra_flags}}
 environment: azureml:<env_name>:<env_version>
 inputs:
   pi0_experiment_name: <pi0_exp_name>
   num_train_steps: 30000
+  train_repo_id: <train_repo_id> # e.g. physical-intelligence/libero
+  val_repo_id: <val_repo_id> # e.g. physical-intelligence/libero-test
   extra_flags: ';'
 outputs:
   MODEL_CHECKPOINTS:
@@ -35,4 +39,4 @@ environment_variables:
 display_name: p0_libero_finetune
 experiment_name: p0_libero_finetune
 compute: <gpu_vm_name>
-code: ../../scripts
+code: ../..  # Upload the entire project root instead of just scripts
