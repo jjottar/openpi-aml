@@ -254,7 +254,7 @@ def _prepare_validation_config(
     )
 
     use_norm_stats = False
-    if hasattr(val_config.data, "repo_id") and (config.val_repo_id or hasattr(val_config.data, "repo_id")):
+    if config.val_repo_id or hasattr(val_config.data, "repo_id"):
         repo_id = config.val_repo_id or (getattr(val_config.data, "repo_id", None) + "-val")
 
         # Create validation data config by copying the training data config but changing repo_id
