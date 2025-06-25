@@ -446,6 +446,15 @@ class TrainConfig:
     # data parallel between 2 groups of devices.
     fsdp_devices: int = 1
 
+    # How often (in steps) to log validation metrics.
+    val_log_interval: int = 100
+    # Validation batch size (optional, defaults to batch_size if not set)
+    val_batch_size: int | None = None
+    # Number of validation batches to average for validation loss
+    val_num_batches: int = 10
+    # Optionally, repo_id for validation set (if different from train)
+    val_repo_id: str | None = None
+
     @property
     def assets_dirs(self) -> pathlib.Path:
         """Get the assets directory for this config."""

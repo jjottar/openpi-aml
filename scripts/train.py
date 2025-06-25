@@ -11,6 +11,7 @@ import flax.traverse_util as traverse_util
 import jax
 import jax.experimental
 import jax.numpy as jnp
+from lerobot.common.datasets.lerobot_dataset import HF_LEROBOT_HOME
 import numpy as np
 import optax
 import tqdm_loggable.auto as tqdm
@@ -26,6 +27,225 @@ import openpi.training.optimizer as _optimizer
 import openpi.training.sharding as sharding
 import openpi.training.utils as training_utils
 import openpi.training.weight_loaders as _weight_loaders
+
+
+def _extract_training_norm_stats(train_data_loader: _data_loader.DataLoader | None) -> dict | None:
+    """Extract normalization stats from the training data loader."""
+    if train_data_loader is not None and hasattr(train_data_loader, "data_config"):
+        training_data_config = train_data_loader.data_config()
+        if hasattr(training_data_config, "norm_stats") and training_data_config.norm_stats is not None:
+            return training_data_config.norm_stats
+    return None
+
+
+def _prepare_validation_config(
+    config: _config.TrainConfig, training_norm_stats: dict | None
+) -> tuple[_config.TrainConfig, str, bool]:
+    """
+    Prepare validation configuration with training norm_stats.
+
+    Returns:
+        tuple: (validation_config, repo_id, use_norm_stats, actual_val_data_config)
+    """
+    val_config = dataclasses.replace(
+        config,
+        batch_size=config.val_batch_size or config.batch_size,
+    )
+
+    use_norm_stats = False
+    if config.val_repo_id or hasattr(val_config.data, "repo_id"):
+        repo_id = config.val_repo_id or (getattr(val_config.data, "repo_id", None) + "-val")
+
+        # Create validation data config by copying the training data config but changing repo_id
+        val_data_config = dataclasses.replace(val_config.data, repo_id=repo_id)
+        val_config = dataclasses.replace(val_config, data=val_data_config)
+
+        # Create the actual DataConfig using the factory and add norm_stats
+        actual_val_data_config = val_config.data.create(val_config.assets_dirs, val_config.model)
+
+        # Explicitly use norm_stats from training data loader for validation
+        if training_norm_stats is not None:
+            actual_val_data_config = dataclasses.replace(actual_val_data_config, norm_stats=training_norm_stats)
+            logging.info("Copied norm_stats from training data loader to validation config")
+            logging.info("Training norm_stats keys: %s", list(training_norm_stats.keys()))
+            use_norm_stats = True
+        else:
+            logging.warning("No norm_stats found in training data loader - skipping normalization for validation")
+
+        return val_config, repo_id, use_norm_stats, actual_val_data_config
+
+    raise ValueError("No validation repository ID could be determined")
+
+
+def _check_validation_dataset_local(repo_id: str) -> bool:
+    """Check if validation dataset exists locally. Returns True if found locally, False if needs download."""
+    try:
+        val_dataset_path = HF_LEROBOT_HOME / repo_id
+        meta_folder = val_dataset_path / "meta"
+        info_json_path = meta_folder / "info.json"
+        if meta_folder.exists() and info_json_path.exists():
+            logging.info(f"Validation dataset found locally: {val_dataset_path}")
+            return True
+        else:
+            logging.info(f"Validation dataset not found locally at {val_dataset_path}, will attempt download")
+            return False
+    except Exception as e:
+        logging.warning(f"Error checking local validation dataset: {e}, will attempt download")
+        return False
+
+
+def _create_validation_data_loader(
+    actual_val_data_config,
+    val_config: _config.TrainConfig,
+    *,
+    use_norm_stats: bool,
+    replicated_sharding: jax.sharding.NamedSharding,
+) -> _data_loader.DataLoader:
+    """Create validation data loader with custom wrapper for training norm_stats."""
+
+    # Custom wrapper class to bridge our modified DataConfig with the expected DataLoader interface
+    class ValidationDataLoader(_data_loader.DataLoader):
+        """
+        Custom data loader wrapper for validation that preserves training normalization stats.
+
+        This class is necessary because:
+        1. Validation datasets typically don't have their own norm_stats.json files
+        2. We need to use the training dataset's normalization stats for consistent validation
+        3. The standard create_data_loader() function expects a TrainConfig, but we have a custom DataConfig
+        """
+
+        def __init__(self, data_config, torch_data_loader):
+            self._data_config = data_config
+            self._torch_data_loader = torch_data_loader
+
+        def data_config(self):
+            return self._data_config
+
+        def __iter__(self):
+            for batch in self._torch_data_loader:
+                yield _model.Observation.from_dict(batch), batch["actions"]
+
+    val_dataset = _data_loader.create_torch_dataset(actual_val_data_config, val_config.model.action_horizon, val_config.model)
+    logging.info(f"Validation dataset created for {actual_val_data_config.repo_id}")
+    val_dataset = _data_loader.transform_dataset(
+        val_dataset, actual_val_data_config, skip_norm_stats=not use_norm_stats
+    )
+
+    val_torch_data_loader = _data_loader.TorchDataLoader(
+        val_dataset,
+        local_batch_size=val_config.batch_size // jax.process_count(),
+        sharding=replicated_sharding,
+        shuffle=False,
+        num_batches=val_config.val_num_batches,
+        num_workers=val_config.num_workers,
+        seed=val_config.seed,
+    )
+
+    return ValidationDataLoader(actual_val_data_config, val_torch_data_loader)
+
+
+def _compute_validation_losses(
+    val_loader: _data_loader.DataLoader,
+    train_state: training_utils.TrainState,
+    mesh: jax.sharding.Mesh,
+    train_state_sharding: jax.sharding.NamedSharding,
+    replicated_sharding: jax.sharding.NamedSharding,
+    config: _config.TrainConfig,
+) -> float | None:
+    """Compute validation losses over multiple batches."""
+
+    # Define validation loss function (similar to train_step structure)
+    @at.typecheck
+    def val_loss_fn(
+        model: _model.BaseModel, rng: at.KeyArrayLike, observation: _model.Observation, actions: _model.Actions
+    ):
+        chunked_loss = model.compute_loss(rng, observation, actions, train=False)
+        return jnp.mean(chunked_loss)
+
+    def validation_step(state, batch, rng):
+        """Single validation step, aligned with train_step structure."""
+        model = nnx.merge(state.model_def, state.params)
+        model.eval()
+
+        observation, actions = batch
+        val_rng = jax.random.fold_in(rng, state.step)
+
+        return val_loss_fn(model, val_rng, observation, actions)
+
+    # JIT compile the validation step
+    pvalidation_step = jax.jit(
+        validation_step,
+        in_shardings=(train_state_sharding, replicated_sharding, replicated_sharding),
+        out_shardings=replicated_sharding,
+    )
+
+    val_iter = iter(val_loader)
+    losses = []
+    # Use a separate RNG for validation to avoid interference with training RNG,
+    # the specific seed offset is arbitrary.
+    val_rng = jax.random.key(config.seed + 1000)
+
+    for batch_idx in range(config.val_num_batches):
+        try:
+            batch = next(val_iter)
+        except StopIteration:
+            break
+
+        try:
+            with sharding.set_mesh(mesh):
+                loss = pvalidation_step(train_state, batch, val_rng)
+            losses.append(jax.device_get(loss))
+        except (RuntimeError, ValueError) as e:
+            logging.warning("Error computing validation loss for batch %d: %s", batch_idx, e)
+            continue
+
+    if not losses:
+        return None
+    return float(jnp.mean(jnp.array(losses)))
+
+
+def compute_validation_loss(
+    config: _config.TrainConfig,
+    train_state: training_utils.TrainState,
+    mesh: jax.sharding.Mesh,
+    train_state_sharding: jax.sharding.NamedSharding,
+    replicated_sharding: jax.sharding.NamedSharding,
+    train_data_loader: _data_loader.DataLoader | None = None,
+) -> float | None:
+    """Compute average validation loss over a few batches. Downloads validation dataset if missing locally."""
+    # Extract training normalization stats
+    training_norm_stats = _extract_training_norm_stats(train_data_loader)
+
+    # Prepare validation configuration
+    try:
+        val_config, repo_id, use_norm_stats, actual_val_data_config = _prepare_validation_config(
+            config, training_norm_stats
+        )
+    except ValueError:
+        logging.warning("Could not determine validation repository ID, skipping validation loss.")
+        return None
+
+    # Check if validation dataset exists locally (same behavior as training dataset)
+    is_local = _check_validation_dataset_local(repo_id)
+    if is_local:
+        logging.info(f"Using local validation dataset: {repo_id}")
+    else:
+        logging.info(f"Validation dataset not found locally, attempting to download: {repo_id}")
+
+    # Create validation data loader (this will use local data or trigger download if needed)
+    try:
+        val_loader = _create_validation_data_loader(
+            actual_val_data_config, val_config, use_norm_stats=use_norm_stats, replicated_sharding=replicated_sharding
+        )
+        if not is_local:
+            logging.info(f"Validation dataset downloaded successfully: {repo_id}")
+    except Exception as e:
+        logging.warning(f"Failed to create validation data loader for {repo_id}: {e}")
+        logging.warning("Skipping validation loss computation.")
+        return None
+
+    # Compute and return validation losses
+    return _compute_validation_losses(val_loader, train_state, mesh, train_state_sharding, replicated_sharding, config)
 
 
 def init_logging():
@@ -267,6 +487,13 @@ def main(config: _config.TrainConfig):
             pbar.write(f"Step {step}: {info_str}")
             wandb.log(reduced_info, step=step)
             infos = []
+        if step % config.val_log_interval == 0:
+            val_loss = compute_validation_loss(
+                config, train_state, mesh, train_state_sharding, replicated_sharding, data_loader
+            )
+            if val_loss is not None:
+                wandb.log({"val_loss": val_loss}, step=step)
+                logging.info("Validation loss at step %d: %.4f", step, val_loss)
         batch = next(data_iter)
 
         if (step % config.save_interval == 0 and step > start_step) or step == config.num_train_steps - 1:
