@@ -27,5 +27,4 @@ COPY . .
 RUN uv venv --python 3.11.9 $UV_PROJECT_ENVIRONMENT
 RUN --mount=type=cache,target=/root/.cache/uv \
     GIT_LFS_SKIP_SMUDGE=1 uv sync --frozen --no-dev \
-    && uv pip install azureml-mlflow \
-    && uv pip install orbax-checkpoint==0.11.1
+    && uv pip install azureml-mlflow 
